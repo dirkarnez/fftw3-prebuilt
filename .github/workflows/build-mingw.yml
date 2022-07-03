@@ -1,0 +1,50 @@
+name: cpp-cmake-mingw-prebuilt-release-actions-workflow
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
+jobs:
+  build:
+    name: Create Release
+    runs-on: windows-2019
+    env:
+      libraryName: fftw3
+      mingwTargetZip: fftw3-${{ github.ref_name }}-x86_64-posix-seh-rev0-8.1.0.zip
+    steps:
+      - name: check mingw version
+        run: gcc --version
+        
+      - name: Checkout
+        uses: actions/checkout@v3
+        
+      - name: try aria2 
+        shell: cmd
+        run: aria2c "https://fftw.org/pub/fftw/fftw-3.3.10.zip" && 7z.exe x fftw-3.3.10.zip
+        
+      - name: cmake
+        shell: cmd
+        run: cd "fftw-3.3.10" && cmake.exe -G"MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="build/${{ env.libraryName }}" -B./build
+        
+      - name: cmake install
+        shell: cmd
+        run: cd fftw-3.3.10\build && cmake --build . && cmake --install .
+        
+      - name: overwrite FFTW3Config.cmake
+        shell: cmd
+        run: xcopy /H /Y /C "FFTW3Config.cmake" "fftw-3.3.10\build\fftw3\lib\cmake\fftw3"
+        
+      - name: Archive Release
+        uses: thedoctor0/zip-release@master
+        with:
+          type: 'zip'
+          directory: "fftw-3.3.10/build/${{ env.libraryName }}"
+          filename: "${{ env.mingwTargetZip }}"
+          
+      - name: Release prebuilt
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "fftw-3.3.10/build/${{ env.libraryName }}/${{ env.mingwTargetZip }}"
+          allowUpdates: true
+          token: ${{ secrets.GITHUB_TOKEN }}
